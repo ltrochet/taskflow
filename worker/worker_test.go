@@ -9,6 +9,10 @@ import (
 	"github.com/ltrochet/taskflow/workflow"
 )
 
+type testData struct {
+	Counter int
+}
+
 type mockTaskUpdater struct {
 	updateCalls int
 	updateErr   error
