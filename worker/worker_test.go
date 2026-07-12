@@ -13,13 +13,13 @@ type testData struct {
 	Counter int
 }
 
-type mockUpdater struct {
+type mockTaskUpdater struct {
 	updateCalls int
 	updateErr   error
 	lastTask    *runtime.Task[testData]
 }
 
-func (m *mockUpdater) Update(
+func (m *mockTaskUpdater) Update(
 	ctx context.Context,
 	task *runtime.Task[testData],
 ) error {
@@ -34,7 +34,7 @@ func newTestComponents(
 ) (
 	*runtime.Runner[testData],
 	*Worker[testData],
-	*mockUpdater,
+	*mockTaskUpdater,
 ) {
 	t.Helper()
 
@@ -62,7 +62,7 @@ func newTestComponents(
 	}
 
 	runner := runtime.NewRunner(wf)
-	updater := &mockUpdater{}
+	updater := &mockTaskUpdater{}
 
 	worker := New(
 		runner,
@@ -77,6 +77,7 @@ func TestWorker_Run(t *testing.T) {
 
 	task := runner.NewTask(
 		testData{},
+		runtime.DefaultQueue,
 	)
 
 	err := worker.Run(
@@ -140,6 +141,7 @@ func TestWorker_UpdateError(t *testing.T) {
 
 	task := runner.NewTask(
 		testData{},
+		runtime.DefaultQueue,
 	)
 
 	err := worker.Run(
@@ -186,7 +188,7 @@ func TestWorker_HandlerError(t *testing.T) {
 	}
 
 	runner := runtime.NewRunner(wf)
-	updater := &mockUpdater{}
+	updater := &mockTaskUpdater{}
 
 	worker := New(
 		runner,
@@ -195,6 +197,7 @@ func TestWorker_HandlerError(t *testing.T) {
 
 	task := runner.NewTask(
 		testData{},
+		runtime.DefaultQueue,
 	)
 
 	err = worker.Run(
@@ -273,7 +276,7 @@ func TestWorker_RunMultipleSteps(t *testing.T) {
 	}
 
 	runner := runtime.NewRunner(wf)
-	updater := &mockUpdater{}
+	updater := &mockTaskUpdater{}
 
 	worker := New(
 		runner,
@@ -282,6 +285,7 @@ func TestWorker_RunMultipleSteps(t *testing.T) {
 
 	task := runner.NewTask(
 		testData{},
+		runtime.DefaultQueue,
 	)
 
 	err = worker.Run(
