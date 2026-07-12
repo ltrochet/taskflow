@@ -1,89 +1,122 @@
 # Taskflow
 
-Taskflow est un framework Go léger permettant de définir et d'exécuter des tâches métier sous forme de machines à états
-finis (FSM).
+Taskflow est un framework Go permettant de définir et d'exécuter des processus métier sous forme de 
+**machines à états finis** (Finite State Machines - FSM).
 
-L'objectif n'est pas de fournir un moteur de workflow complet avec ordonnanceur, interface graphique ou moteur de 
-règles, mais de proposer une base simple et robuste pour exécuter des processus métier composés d'étapes successives.
+Il fournit les briques nécessaires pour construire des traitements robustes, persistants et distribués,
+tout en laissant le code métier au cœur de l'application.
 
-## Principes
+Taskflow ne cherche pas à remplacer un moteur BPM complet. Il privilégie une approche simple, 
+idiomatique et entièrement pilotée par le code Go.
 
-Taskflow repose sur quelques idées simples :
+## Caractéristiques
 
-* un processus métier est décrit comme une machine à états finis ;
-* chaque état correspond à une étape d'exécution ;
-* chaque étape possède un handler métier ;
-* le résultat d'une étape produit un événement ;
-* l'événement détermine la transition vers l'état suivant ;
-* l'exécution peut être reprise à partir du dernier état connu.
+* définition déclarative des workflows ;
+* validation du workflow à la construction ;
+* exécution étape par étape ;
+* reprise après interruption ;
+* persistance indépendante de l'implémentation ;
+* contrôle de concurrence optimiste ;
+* acquisition concurrente des tâches ;
+* exécution distribuée grâce à plusieurs workers.
 
-Le framework sépare clairement :
+## Architecture
+
+Taskflow est organisé en plusieurs packages indépendants :
 
 ```
 workflow
-    |
-    | définit le processus métier
-    |
+    │
+    ▼
 runtime
-    |
-    | exécute une instance de tâche
-    |
+    │
+    ▼
+worker
+    │
+    ▼
+executor
+    ▲
+    │
 storage
-    |
-    | persiste l'avancement
 ```
 
-## Exemple simple
+Chaque package possède une responsabilité unique.
 
-Définition d'un workflow :
+| Package    | Description                                   |
+| ---------- | --------------------------------------------- |
+| `workflow` | Définition et validation d'un workflow.       |
+| `runtime`  | Exécution d'une étape d'une tâche.            |
+| `storage`  | Contrats de persistance et erreurs communes.  |
+| `memory`   | Implémentation de stockage en mémoire.        |
+| `pgsql`    | Implémentation PostgreSQL.                    |
+| `worker`   | Exécute une tâche jusqu'à son terme.          |
+| `executor` | Acquiert les tâches et pilote leur exécution. |
+
+## Définir un workflow
+
+Un workflow est construit à l'aide du builder.
 
 ```go
 builder := workflow.New[ImportData]("import")
 
 builder.
-    State("Download", downloadHandler).
-    Success("Validate").
-    Failure("Failed")
+	State("download", downloadHandler).
+	Success("validate").
+	Failure("failed")
 
 builder.
-    State("Validate", validateHandler).
-    Success("Store").
-    Failure("Failed")
+	State("validate", validateHandler).
+	Success("store").
+	Failure("failed")
 
 builder.
-    State("Store", storeHandler)
+	State("store", storeHandler).
+	Complete()
 
 builder.
-    State("Failed", failedHandler)
+	State("failed", failedHandler).
+	Complete()
+
+builder.Initial("download")
 
 wf, err := builder.Build()
-
 if err != nil {
-    panic(err)
+	panic(err)
 }
 ```
 
-Le workflow obtenu est une définition compilée et immutable.
+Une fois construit, un workflow est immutable et peut être partagé entre plusieurs goroutines.
 
-## Etats et transitions
+## Les handlers
 
-Un état représente une étape métier.
-
-Exemple :
+Chaque état est associé à un handler métier.
 
 ```go
 func downloadHandler(
-    ctx context.Context,
-    data *ImportData,
+	ctx context.Context,
+	data *ImportData,
 ) (workflow.Event, error) {
 
-    // traitement métier
+	// traitement métier
 
-    return workflow.Success, nil
+	return workflow.Success, nil
 }
 ```
 
-Les événements disponibles sont :
+Le handler :
+
+* reçoit le contexte d'exécution ;
+* modifie les données métier ;
+* retourne un événement ;
+* peut retourner une erreur.
+
+Un panic est automatiquement converti en erreur par le runtime.
+
+## Les transitions
+
+Les transitions sont déclenchées par les événements retournés par les handlers.
+
+Les événements prédéfinis sont :
 
 * `Success`
 * `Failure`
@@ -94,17 +127,11 @@ Les événements disponibles sont :
 Une transition est définie par :
 
 ```
-état courant + événement = état suivant
-```
-
-Exemple :
-
-```
-Download
-    |
-    | Success
-    v
-Validate
+état courant
+        +
+événement
+        =
+état suivant
 ```
 
 ## Validation
@@ -113,117 +140,124 @@ Lors de l'appel à `Build()`, Taskflow vérifie notamment :
 
 * les états dupliqués ;
 * les transitions dupliquées ;
-* les transitions vers des états inexistants ;
-* l'existence d'un état initial ;
+* les transitions invalides ;
+* l'existence de l'état initial ;
 * les états inaccessibles.
 
 Un workflow invalide ne peut pas être exécuté.
 
-## Architecture actuelle
+## Exécution
 
-Le package `workflow` contient :
-
-```
-workflow/
-├── builder.go
-├── compile.go
-├── errors.go
-├── event.go
-├── handler.go
-├── transition.go
-├── workflow.go
-└── workflow_test.go
-```
-
-### Builder
-
-Le builder sert uniquement à déclarer un workflow.
-
-Il conserve :
-
-* les états ;
-* les handlers ;
-* les transitions.
-
-### Compile
-
-La compilation transforme la définition déclarative en une structure optimisée pour l'exécution :
-
-```
-Builder
-
-   Build()
-
-Workflow
-```
-
-Le workflow compilé utilise une représentation rapide :
+Le package `runtime` exécute une étape du workflow.
 
 ```go
-map[state]map[event]nextState
+runner := runtime.NewRunner(wf)
+
+task := runner.NewTask(
+	data,
+	runtime.DefaultQueue,
+)
+
+result, err := runner.Step(ctx, task)
 ```
 
-permettant une résolution de transition en temps constant.
+Chaque appel à `Step()` :
+
+* exécute le handler de l'état courant ;
+* applique la transition correspondante ;
+* met à jour l'état de la tâche.
+
+## Persistance
+
+Taskflow sépare complètement l'exécution de la persistance.
+
+Le package `storage` définit les contrats utilisés par les autres composants.
+
+Deux implémentations sont actuellement disponibles :
+
+* `memory`, adaptée aux tests ou aux applications simples ;
+* `pgsql`, basée sur PostgreSQL.
+
+L'implémentation PostgreSQL utilise notamment :
+
+* le verrouillage optimiste via un numéro de version ;
+* `FOR UPDATE SKIP LOCKED` pour permettre à plusieurs executors de consommer la même file de tâches sans conflit.
+
+## Worker
+
+Le package `worker` exécute une tâche jusqu'à son terme.
+
+À chaque étape, il :
+
+* exécute le handler métier ;
+* met à jour le statut de la tâche ;
+* persiste sa progression.
+
+En cas d'erreur métier, la tâche est marquée comme échouée avant que l'erreur ne soit renvoyée.
+
+## Executor
+
+Le package `executor` pilote l'exécution continue des tâches.
+
+Il :
+
+* acquiert une tâche disponible ;
+* la confie au worker ;
+* applique un backoff lorsqu'aucune tâche n'est disponible ;
+* peut continuer ou s'arrêter selon la politique configurée lorsqu'une erreur survient.
+
+Plusieurs executors peuvent fonctionner simultanément sur la même base PostgreSQL afin de répartir automatiquement
+la charge.
+
+## Exemple
+
+```go
+runner := runtime.NewRunner(workflow)
+
+repo, err := pgsql.Open[Data](dsn)
+if err != nil {
+	panic(err)
+}
+defer repo.Close()
+
+worker := worker.New(
+	runner,
+	repo,
+)
+
+consumer, err := executor.NewConsumer(
+	repo,
+	worker,
+)
+if err != nil {
+	panic(err)
+}
+
+if err := consumer.Serve(ctx); err != nil {
+	log.Fatal(err)
+}
+```
 
 ## Tests
 
-Le package workflow possède des tests couvrant :
+L'ensemble des packages est couvert par des tests unitaires.
 
-* la construction d'un workflow ;
-* les transitions valides ;
-* les états inconnus ;
-* les transitions dupliquées ;
-* les états inaccessibles.
-
-Lancer les tests :
+Exécuter tous les tests :
 
 ```bash
 go test ./...
 ```
-
-## Roadmap
-
-### Runtime
-
-Le prochain composant est le runtime d'exécution.
-
-Il aura pour rôle :
-
-* charger une instance de tâche ;
-* exécuter le handler de l'état courant ;
-* récupérer l'événement produit ;
-* appliquer la transition ;
-* sauvegarder la progression.
-
-### Storage
-
-Une couche de persistance permettra ensuite de stocker :
-
-* l'état courant ;
-* les données métier ;
-* l'historique des transitions ;
-* les erreurs d'exécution.
-
-Une implémentation PostgreSQL est prévue.
-
-### Worker
-
-Les workers permettront une exécution distribuée :
-
-* un worker récupère une tâche disponible ;
-* il exécute une ou plusieurs étapes ;
-* il persiste l'avancement ;
-* un autre worker peut reprendre après interruption.
 
 ## Philosophie
 
 Taskflow privilégie :
 
 * la simplicité ;
-* la transparence ;
+* la lisibilité ;
+* la robustesse ;
 * la persistance explicite ;
-* la robustesse face aux interruptions ;
-* une séparation claire entre définition métier et exécution.
+* la reprise après interruption ;
+* la séparation entre logique métier et infrastructure.
 
-Le framework ne cherche pas à remplacer les moteurs BPM complexes, mais à fournir une solution légère et idiomatique 
-pour des processus métier contrôlés par du code Go.
+L'objectif est de fournir un framework léger et idiomatique permettant de construire des traitements métier fiables,
+tout en laissant aux applications le contrôle de leur architecture.
