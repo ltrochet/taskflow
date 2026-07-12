@@ -6,7 +6,7 @@ import (
 	"github.com/ltrochet/taskflow/runtime"
 )
 
-// TaskAcquirer récupère une tâche prête à être exécutée.
+// TaskAcquirer acquiert une tâche prête à être exécutée.
 type TaskAcquirer[T any] interface {
 	Acquire(
 		ctx context.Context,
@@ -27,23 +27,39 @@ type Consumer[T any] struct {
 	acquirer TaskAcquirer[T]
 	runner   TaskRunner[T]
 
-	queues []runtime.Queue
+	queues  []runtime.Queue
+	backoff Backoff
 }
 
-// NewConsumer crée un nouveau Consumer.
-//
-// Si aucune queue n'est fournie, la queue par défaut
-// sera utilisée par le repository.
+// NewConsumer crée un Consumer.
 func NewConsumer[T any](
 	acquirer TaskAcquirer[T],
 	runner TaskRunner[T],
-	queues ...runtime.Queue,
-) *Consumer[T] {
-	return &Consumer[T]{
+	options ...Option[T],
+) (*Consumer[T], error) {
+	backoff, err := NewDefaultBackoff()
+	if err != nil {
+		return nil, err
+	}
+
+	c := &Consumer[T]{
 		acquirer: acquirer,
 		runner:   runner,
-		queues:   queues,
+		queues: []runtime.Queue{
+			runtime.DefaultQueue,
+		},
+		backoff: backoff,
 	}
+
+	for _, option := range options {
+		if option == nil {
+			continue
+		}
+
+		option(c)
+	}
+
+	return c, nil
 }
 
 // Consume acquiert puis exécute une tâche.

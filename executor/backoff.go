@@ -6,6 +6,17 @@ import (
 	"time"
 )
 
+const (
+	defaultMinBackoff = 100 * time.Millisecond
+	defaultMaxBackoff = 5 * time.Second
+)
+
+// ErrInvalidBackoff indique qu'une configuration de backoff
+// est invalide.
+var ErrInvalidBackoff = errors.New(
+	"invalid backoff",
+)
+
 // Backoff détermine le délai d'attente entre deux
 // tentatives d'acquisition lorsqu'aucune tâche n'est
 // disponible.
@@ -18,10 +29,6 @@ type Backoff interface {
 	// tentative.
 	Next() time.Duration
 }
-
-var ErrInvalidBackoff = errors.New(
-	"invalid backoff",
-)
 
 // ExponentialBackoff implémente un backoff exponentiel
 // borné.
@@ -87,4 +94,13 @@ func (b *ExponentialBackoff) Next() time.Duration {
 	b.current = next
 
 	return b.current
+}
+
+// NewDefaultBackoff crée un backoff exponentiel avec
+// les paramètres par défaut.
+func NewDefaultBackoff() (*ExponentialBackoff, error) {
+	return NewExponentialBackoff(
+		defaultMinBackoff,
+		defaultMaxBackoff,
+	)
 }

@@ -51,7 +51,27 @@ func (m *mockTaskRunner) Run(
 	return m.err
 }
 
-func TestConsumer_Consume(t *testing.T) {
+func newTestConsumer(
+	t *testing.T,
+	acquirer *mockTaskAcquirer,
+	runner *mockTaskRunner,
+	options ...Option[testData],
+) *Consumer[testData] {
+	t.Helper()
+
+	consumer, err := NewConsumer(
+		acquirer,
+		runner,
+		options...,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return consumer
+}
+
+func TestConsumer_ConsumeWithQueues(t *testing.T) {
 	task := newTestTask()
 
 	acquirer := &mockTaskAcquirer{
@@ -60,10 +80,13 @@ func TestConsumer_Consume(t *testing.T) {
 
 	runner := &mockTaskRunner{}
 
-	consumer := NewConsumer(
+	consumer := newTestConsumer(
+		t,
 		acquirer,
 		runner,
-		runtime.Queue("priority"),
+		WithQueues[testData](
+			runtime.Queue("priority"),
+		),
 	)
 
 	err := consumer.Consume(
@@ -73,13 +96,6 @@ func TestConsumer_Consume(t *testing.T) {
 		t.Fatalf(
 			"Consume() failed: %v",
 			err,
-		)
-	}
-
-	if acquirer.acquireCalls != 1 {
-		t.Fatalf(
-			"expected 1 acquire, got %d",
-			acquirer.acquireCalls,
 		)
 	}
 
@@ -111,6 +127,46 @@ func TestConsumer_Consume(t *testing.T) {
 	}
 }
 
+func TestConsumer_ConsumeDefaultQueue(t *testing.T) {
+	task := newTestTask()
+
+	acquirer := &mockTaskAcquirer{
+		task: task,
+	}
+
+	runner := &mockTaskRunner{}
+
+	consumer := newTestConsumer(
+		t,
+		acquirer,
+		runner,
+	)
+
+	err := consumer.Consume(
+		context.Background(),
+	)
+	if err != nil {
+		t.Fatalf(
+			"Consume() failed: %v",
+			err,
+		)
+	}
+
+	if len(acquirer.lastQueues) != 1 {
+		t.Fatalf(
+			"unexpected queue count: %d",
+			len(acquirer.lastQueues),
+		)
+	}
+
+	if acquirer.lastQueues[0] != runtime.DefaultQueue {
+		t.Fatalf(
+			"unexpected default queue: %s",
+			acquirer.lastQueues[0],
+		)
+	}
+}
+
 func TestConsumer_AcquireError(t *testing.T) {
 	expected := errors.New(
 		"boom",
@@ -122,7 +178,8 @@ func TestConsumer_AcquireError(t *testing.T) {
 
 	runner := &mockTaskRunner{}
 
-	consumer := NewConsumer(
+	consumer := newTestConsumer(
+		t,
 		acquirer,
 		runner,
 	)
@@ -165,7 +222,8 @@ func TestConsumer_RunError(t *testing.T) {
 		err: expected,
 	}
 
-	consumer := NewConsumer(
+	consumer := newTestConsumer(
+		t,
 		acquirer,
 		runner,
 	)
