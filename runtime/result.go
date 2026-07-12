@@ -1,6 +1,6 @@
 package runtime
 
-import "git.infra.sas.ina/an/gamma/taskflow.git/workflow"
+import "github.com/ltrochet/taskflow/workflow"
 
 // StepResult décrit le résultat de l'exécution d'une étape.
 //

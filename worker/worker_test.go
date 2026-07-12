@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"git.infra.sas.ina/an/gamma/taskflow.git/runtime"
-	"git.infra.sas.ina/an/gamma/taskflow.git/workflow"
+	"github.com/ltrochet/taskflow/runtime"
+	"github.com/ltrochet/taskflow/workflow"
 )
 
 type testData struct {

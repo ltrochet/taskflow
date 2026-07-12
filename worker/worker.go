@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"git.infra.sas.ina/an/gamma/taskflow.git/runtime"
+	"github.com/ltrochet/taskflow/runtime"
 )
 
 // TaskUpdater persiste l'état courant d'une tâche.

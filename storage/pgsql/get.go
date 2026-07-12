@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"git.infra.sas.ina/an/gamma/taskflow.git/runtime"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/ltrochet/taskflow/runtime"
 )
 
 const sqlGetTask = `

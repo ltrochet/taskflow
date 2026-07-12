@@ -6,8 +6,8 @@ import (
 	"slices"
 	"sync"
 
-	"git.infra.sas.ina/an/gamma/taskflow.git/runtime"
 	"github.com/google/uuid"
+	"github.com/ltrochet/taskflow/runtime"
 )
 
 var (

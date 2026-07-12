@@ -3,7 +3,7 @@ package pgsql
 import (
 	"encoding/json"
 
-	"git.infra.sas.ina/an/gamma/taskflow.git/runtime"
+	"github.com/ltrochet/taskflow/runtime"
 )
 
 func marshalTask[T any](task *runtime.Task[T]) (*taskRecord, error) {

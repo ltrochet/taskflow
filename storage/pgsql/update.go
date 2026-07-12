@@ -3,7 +3,7 @@ package pgsql
 import (
 	"context"
 
-	"git.infra.sas.ina/an/gamma/taskflow.git/runtime"
+	"github.com/ltrochet/taskflow/runtime"
 )
 
 const sqlUpdateTask = `

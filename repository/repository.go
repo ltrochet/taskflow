@@ -3,8 +3,8 @@ package repository
 import (
 	"context"
 
-	"git.infra.sas.ina/an/gamma/taskflow.git/runtime"
 	"github.com/google/uuid"
+	"github.com/ltrochet/taskflow/runtime"
 )
 
 type Reader[T any] interface {
