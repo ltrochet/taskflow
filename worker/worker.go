@@ -2,7 +2,6 @@ package worker
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ltrochet/taskflow/runtime"
 )
@@ -53,9 +52,10 @@ func (w *Worker[T]) Run(
 	for {
 		result, err := w.runner.Step(ctx, task)
 		if err != nil {
-			return errors.Join(
-				err,
-				w.update(ctx, task, runtime.StatusFailed),
+			return w.update(
+				ctx,
+				task,
+				runtime.StatusFailed,
 			)
 		}
 

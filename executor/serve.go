@@ -8,6 +8,22 @@ import (
 	"github.com/ltrochet/taskflow/storage"
 )
 
+func wait(
+	ctx context.Context,
+	delay time.Duration,
+) error {
+	timer := time.NewTimer(delay)
+
+	select {
+	case <-ctx.Done():
+		timer.Stop()
+		return ctx.Err()
+
+	case <-timer.C:
+		return nil
+	}
+}
+
 // Serve exécute continuellement les tâches disponibles.
 //
 // La boucle s'arrête lorsque le contexte est annulé
@@ -30,17 +46,8 @@ func (c *Consumer[T]) Serve(
 			err,
 			storage.ErrNoTaskAvailable,
 		):
-			timer := time.NewTimer(
-				c.backoff.Next(),
-			)
-
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-
-				return ctx.Err()
-
-			case <-timer.C:
+			if err := wait(ctx, c.backoff.Next()); err != nil {
+				return err
 			}
 
 		default:

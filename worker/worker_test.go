@@ -211,14 +211,9 @@ func TestWorker_HandlerError(t *testing.T) {
 		context.Background(),
 		task,
 	)
-
-	if !errors.Is(
-		err,
-		expected,
-	) {
+	if err != nil {
 		t.Fatalf(
-			"expected %v, got %v",
-			expected,
+			"Run() failed: %v",
 			err,
 		)
 	}
@@ -227,6 +222,13 @@ func TestWorker_HandlerError(t *testing.T) {
 		t.Fatalf(
 			"unexpected status: %s",
 			task.Status,
+		)
+	}
+
+	if task.Version != 1 {
+		t.Fatalf(
+			"unexpected version: %d",
+			task.Version,
 		)
 	}
 
