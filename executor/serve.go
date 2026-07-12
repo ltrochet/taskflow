@@ -13,15 +13,27 @@ func wait(
 	delay time.Duration,
 ) error {
 	timer := time.NewTimer(delay)
+	defer timer.Stop()
 
 	select {
 	case <-ctx.Done():
-		timer.Stop()
 		return ctx.Err()
 
 	case <-timer.C:
 		return nil
 	}
+}
+
+func (c *Consumer[T]) handleError(err error) {
+	if c.errorHandler == nil {
+		return
+	}
+
+	defer func() {
+		_ = recover()
+	}()
+
+	c.errorHandler(err)
 }
 
 // Serve exécute continuellement les tâches disponibles.
@@ -46,12 +58,26 @@ func (c *Consumer[T]) Serve(
 			err,
 			storage.ErrNoTaskAvailable,
 		):
-			if err := wait(ctx, c.backoff.Next()); err != nil {
+			if err := wait(
+				ctx,
+				c.backoff.Next(),
+			); err != nil {
 				return err
 			}
 
 		default:
-			return err
+			c.handleError(err)
+
+			if c.errorPolicy == ErrorPolicyStop {
+				return err
+			}
+
+			if err := wait(
+				ctx,
+				c.retryDelay,
+			); err != nil {
+				return err
+			}
 		}
 	}
 }

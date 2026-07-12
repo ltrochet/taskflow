@@ -2,9 +2,12 @@ package executor
 
 import (
 	"context"
+	"time"
 
 	"github.com/ltrochet/taskflow/runtime"
 )
+
+const defaultRetryDelay = 30 * time.Second
 
 // TaskAcquirer acquiert une tâche prête à être exécutée.
 type TaskAcquirer[T any] interface {
@@ -27,8 +30,13 @@ type Consumer[T any] struct {
 	acquirer TaskAcquirer[T]
 	runner   TaskRunner[T]
 
-	queues  []runtime.Queue
+	queues []runtime.Queue
+
 	backoff Backoff
+
+	errorPolicy  ErrorPolicy
+	errorHandler ErrorHandler
+	retryDelay   time.Duration
 }
 
 // NewConsumer crée un Consumer.
@@ -45,10 +53,15 @@ func NewConsumer[T any](
 	c := &Consumer[T]{
 		acquirer: acquirer,
 		runner:   runner,
+
 		queues: []runtime.Queue{
 			runtime.DefaultQueue,
 		},
+
 		backoff: backoff,
+
+		errorPolicy: ErrorPolicyStop,
+		retryDelay:  defaultRetryDelay,
 	}
 
 	for _, option := range options {
