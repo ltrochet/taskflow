@@ -1,0 +1,212 @@
+package pgsql
+
+import (
+	"context"
+	"errors"
+	"testing"
+
+	"git.infra.sas.ina/an/gamma/taskflow.git/runtime"
+)
+
+type testData struct {
+	Value string `json:"value"`
+}
+
+func newTask(queue runtime.Queue) *runtime.Task[testData] {
+	return &runtime.Task[testData]{
+		Workflow: "test",
+		Queue:    queue,
+
+		State:  "start",
+		Status: runtime.StatusPending,
+
+		Data: testData{
+			Value: "initial",
+		},
+
+		Version: 0,
+	}
+}
+
+func newTestRepository(t *testing.T) *Repository[testData] {
+	return nil
+}
+
+func TestRepository_CreateAndGet(t *testing.T) {
+	ctx := context.Background()
+
+	repo := newTestRepository(t)
+	defer repo.Close()
+
+	task := newTask(
+		runtime.DefaultQueue,
+	)
+
+	err := repo.Create(
+		ctx,
+		task,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := repo.Get(
+		ctx,
+		task.ID,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got.ID != task.ID {
+		t.Fatalf(
+			"unexpected id: %s",
+			got.ID,
+		)
+	}
+
+	if got.Queue != runtime.DefaultQueue {
+		t.Fatalf(
+			"unexpected queue: %s",
+			got.Queue,
+		)
+	}
+
+	if got.Data.Value != "initial" {
+		t.Fatalf(
+			"unexpected data: %s",
+			got.Data.Value,
+		)
+	}
+}
+
+func TestRepository_AcquireDefaultQueue(t *testing.T) {
+	ctx := context.Background()
+
+	repo := newTestRepository(t)
+	defer repo.Close()
+
+	task := newTask(
+		runtime.DefaultQueue,
+	)
+
+	err := repo.Create(
+		ctx,
+		task,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	acquired, err := repo.Acquire(
+		ctx,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if acquired.ID != task.ID {
+		t.Fatalf(
+			"unexpected task: %s",
+			acquired.ID,
+		)
+	}
+
+	if acquired.Status != runtime.StatusRunning {
+		t.Fatalf(
+			"unexpected status: %s",
+			acquired.Status,
+		)
+	}
+}
+
+func TestRepository_AcquireSpecificQueue(t *testing.T) {
+	ctx := context.Background()
+
+	repo := newTestRepository(t)
+	defer repo.Close()
+
+	task := newTask(
+		runtime.Queue("priority"),
+	)
+
+	err := repo.Create(
+		ctx,
+		task,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = repo.Acquire(
+		ctx,
+		runtime.DefaultQueue,
+	)
+
+	if !errors.Is(
+		err,
+		ErrNoTaskAvailable,
+	) {
+		t.Fatalf(
+			"expected ErrNoTaskAvailable, got %v",
+			err,
+		)
+	}
+
+	acquired, err := repo.Acquire(
+		ctx,
+		runtime.Queue("priority"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if acquired.ID != task.ID {
+		t.Fatalf(
+			"unexpected task: %s",
+			acquired.ID,
+		)
+	}
+
+	if acquired.Queue != runtime.Queue("priority") {
+		t.Fatalf(
+			"unexpected queue: %s",
+			acquired.Queue,
+		)
+	}
+}
+
+func TestRepository_AcquireMultipleQueues(t *testing.T) {
+	ctx := context.Background()
+
+	repo := newTestRepository(t)
+	defer repo.Close()
+
+	task := newTask(
+		runtime.Queue("priority"),
+	)
+
+	err := repo.Create(
+		ctx,
+		task,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	acquired, err := repo.Acquire(
+		ctx,
+		runtime.Queue("critical"),
+		runtime.Queue("priority"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if acquired.ID != task.ID {
+		t.Fatalf(
+			"unexpected task: %s",
+			acquired.ID,
+		)
+	}
+}
