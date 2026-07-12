@@ -39,6 +39,10 @@ func (r *Runner[T]) NewTask(
 	}
 }
 
+// runHandler exécute un handler de workflow.
+//
+// Tout panic produit par le handler est converti en
+// ErrHandlerPanic.
 func (r *Runner[T]) runHandler(
 	ctx context.Context,
 	handler workflow.HandlerFunc[T],

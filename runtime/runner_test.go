@@ -229,3 +229,74 @@ func TestRunner_TaskCompleted(t *testing.T) {
 		t.Fatalf("expected ErrTaskCompleted, got %v", err)
 	}
 }
+
+func TestRunner_StepHandlerPanic(t *testing.T) {
+	expected := "boom"
+
+	builder := workflow.New[testData]("test")
+
+	builder.State(
+		"start",
+		func(
+			ctx context.Context,
+			data *testData,
+		) (workflow.Event, error) {
+			panic(expected)
+		},
+	)
+
+	builder.Initial("start")
+
+	wf, err := builder.Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	runner := NewRunner(wf)
+
+	task := runner.NewTask(
+		testData{},
+		DefaultQueue,
+	)
+
+	state := task.State
+
+	result, err := runner.Step(
+		context.Background(),
+		task,
+	)
+
+	if result != nil {
+		t.Fatal("expected nil result")
+	}
+
+	if !errors.Is(err, ErrHandlerPanic) {
+		t.Fatalf(
+			"expected %v, got %v",
+			ErrHandlerPanic,
+			err,
+		)
+	}
+
+	if task.State != state {
+		t.Fatalf(
+			"state changed: %q -> %q",
+			state,
+			task.State,
+		)
+	}
+
+	if task.Status != StatusPending {
+		t.Fatalf(
+			"unexpected status: %s",
+			task.Status,
+		)
+	}
+
+	if task.Version != 0 {
+		t.Fatalf(
+			"unexpected version: %d",
+			task.Version,
+		)
+	}
+}
