@@ -16,6 +16,10 @@ func (c *Consumer[T]) Serve(
 	ctx context.Context,
 ) error {
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		err := c.Consume(ctx)
 
 		switch {

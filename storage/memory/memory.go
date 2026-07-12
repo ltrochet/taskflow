@@ -52,7 +52,11 @@ func (r *Repository[T]) Update(
 		return storage.ErrTaskNotFound
 	}
 
-	r.tasks[task.ID] = cloneTask(task)
+	stored := cloneTask(task)
+	stored.Version++
+
+	r.tasks[task.ID] = stored
+	task.Version++
 
 	return nil
 }

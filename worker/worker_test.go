@@ -24,9 +24,16 @@ func (m *mockTaskUpdater) Update(
 	task *runtime.Task[testData],
 ) error {
 	m.updateCalls++
+
+	if m.updateErr != nil {
+		return m.updateErr
+	}
+
+	task.Version++
+
 	m.lastTask = task
 
-	return m.updateErr
+	return nil
 }
 
 func newTestComponents(
@@ -331,6 +338,90 @@ func TestWorker_RunMultipleSteps(t *testing.T) {
 		t.Fatalf(
 			"expected 2 updates, got %d",
 			updater.updateCalls,
+		)
+	}
+}
+
+func TestWorker_VersionManagedByUpdater(t *testing.T) {
+	builder := workflow.New[testData]("test")
+
+	builder.
+		State(
+			"start",
+			func(
+				ctx context.Context,
+				data *testData,
+			) (workflow.Event, error) {
+				data.Counter++
+
+				return workflow.Success, nil
+			},
+		).
+		Success("process")
+
+	builder.
+		State(
+			"process",
+			func(
+				ctx context.Context,
+				data *testData,
+			) (workflow.Event, error) {
+				data.Counter++
+
+				return workflow.Success, nil
+			},
+		).
+		Complete()
+
+	builder.Initial("start")
+
+	wf, err := builder.Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	runner := runtime.NewRunner(wf)
+	updater := &mockTaskUpdater{}
+
+	worker := New(
+		runner,
+		updater,
+	)
+
+	task := runner.NewTask(
+		testData{},
+		runtime.DefaultQueue,
+	)
+
+	err = worker.Run(
+		context.Background(),
+		task,
+	)
+	if err != nil {
+		t.Fatalf(
+			"Run() failed: %v",
+			err,
+		)
+	}
+
+	if updater.updateCalls != 2 {
+		t.Fatalf(
+			"expected 2 updates, got %d",
+			updater.updateCalls,
+		)
+	}
+
+	if task.Version != 2 {
+		t.Fatalf(
+			"expected version 2, got %d",
+			task.Version,
+		)
+	}
+
+	if task.Data.Counter != 2 {
+		t.Fatalf(
+			"expected 2 executions, got %d",
+			task.Data.Counter,
 		)
 	}
 }

@@ -179,7 +179,6 @@ func TestRepository_Update(t *testing.T) {
 
 	task.State = workflow.StateCompleted
 	task.Status = runtime.StatusCompleted
-	task.Version = 1
 
 	err := repo.Update(
 		context.Background(),

@@ -51,7 +51,6 @@ func (w *Worker[T]) Run(
 	task *runtime.Task[T],
 ) error {
 	for {
-
 		result, err := w.runner.Step(ctx, task)
 		if err != nil {
 			return errors.Join(
@@ -59,8 +58,6 @@ func (w *Worker[T]) Run(
 				w.update(ctx, task, runtime.StatusFailed),
 			)
 		}
-
-		task.Version++
 
 		status := runtime.StatusRunning
 		if result.Completed {
