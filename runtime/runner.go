@@ -39,6 +39,27 @@ func (r *Runner[T]) NewTask(
 	}
 }
 
+func (r *Runner[T]) runHandler(
+	ctx context.Context,
+	handler workflow.HandlerFunc[T],
+	data *T,
+) (
+	event workflow.Event,
+	err error,
+) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf(
+				"%w: %v",
+				ErrHandlerPanic,
+				recovered,
+			)
+		}
+	}()
+
+	return handler(ctx, data)
+}
+
 // Step exécute l'étape courante de la tâche.
 //
 // Une étape correspond à l'exécution du handler associé
@@ -67,8 +88,9 @@ func (r *Runner[T]) Step(
 	previous := task.State
 
 	// Exécution de l'étape métier.
-	event, err := handler(
+	event, err := r.runHandler(
 		ctx,
+		handler,
 		&task.Data,
 	)
 	if err != nil {

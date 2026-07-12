@@ -11,5 +11,9 @@ var (
 	// pour l'événement retourné par le handler.
 	ErrInvalidTransition = errors.New("invalid transition")
 
+	// ErrHandlerPanic indique qu'un handler de workflow
+	// a provoqué un panic.
+	ErrHandlerPanic = errors.New("handler panic")
+
 	ErrTaskCompleted = errors.New("task already completed")
 )
