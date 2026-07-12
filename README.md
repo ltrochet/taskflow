@@ -75,7 +75,7 @@ builder.
 
 builder.
 	State("failed", failedHandler).
-	Complete()
+	Fail()
 
 builder.Initial("download")
 
@@ -85,11 +85,11 @@ if err != nil {
 }
 ```
 
-Une fois construit, un workflow est immutable et peut être partagé entre plusieurs goroutines.
+Une fois construit, un workflow est immuable et peut être partagé entre plusieurs goroutines.
 
-## Les handlers
+## Les gestionnaires
 
-Chaque état est associé à un handler métier.
+Chaque état est associé à un gestionnaire métier.
 
 ```go
 func downloadHandler(
@@ -103,7 +103,7 @@ func downloadHandler(
 }
 ```
 
-Le handler :
+Le gestionnaire :
 
 * reçoit le contexte d'exécution ;
 * modifie les données métier ;
@@ -114,7 +114,7 @@ Un panic est automatiquement converti en erreur par le runtime.
 
 ## Les transitions
 
-Les transitions sont déclenchées par les événements retournés par les handlers.
+Les transitions sont déclenchées par les événements retournés par les gestionnaires.
 
 Les événements prédéfinis sont :
 
@@ -163,7 +163,7 @@ result, err := runner.Step(ctx, task)
 
 Chaque appel à `Step()` :
 
-* exécute le handler de l'état courant ;
+* exécute le gestionnaire de l'état courant ;
 * applique la transition correspondante ;
 * met à jour l'état de la tâche.
 
@@ -181,7 +181,7 @@ Deux implémentations sont actuellement disponibles :
 L'implémentation PostgreSQL utilise notamment :
 
 * le verrouillage optimiste via un numéro de version ;
-* `FOR UPDATE SKIP LOCKED` pour permettre à plusieurs executors de consommer la même file de tâches sans conflit.
+* `FOR UPDATE SKIP LOCKED` pour permettre à plusieurs exécuteurs de consommer la même file de tâches sans conflit.
 
 ## Worker
 
@@ -189,7 +189,7 @@ Le package `worker` exécute une tâche jusqu'à son terme.
 
 À chaque étape, il :
 
-* exécute le handler métier ;
+* exécute le gestionnaire métier ;
 * met à jour le statut de la tâche ;
 * persiste sa progression.
 
