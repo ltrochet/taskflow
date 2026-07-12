@@ -52,7 +52,7 @@ func (m *mockTaskRunner) Run(
 }
 
 func TestConsumer_Consume(t *testing.T) {
-	task := &runtime.Task[testData]{}
+	task := newTestTask()
 
 	acquirer := &mockTaskAcquirer{
 		task: task,
@@ -155,7 +155,7 @@ func TestConsumer_RunError(t *testing.T) {
 		"boom",
 	)
 
-	task := &runtime.Task[testData]{}
+	task := newTestTask()
 
 	acquirer := &mockTaskAcquirer{
 		task: task,
