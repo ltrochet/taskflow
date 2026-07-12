@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ltrochet/taskflow/runtime"
+	"github.com/ltrochet/taskflow/storage"
 )
 
 const sqlUpdateTask = `
@@ -56,12 +57,12 @@ func (r *Repository[T]) Update(
 	// Aucune ligne mise à jour.
 	// On distingue "tâche inexistante" de "conflit de version".
 	_, err = r.Get(ctx, task.ID)
-	if err == ErrTaskNotFound {
-		return ErrTaskNotFound
+	if err == storage.ErrTaskNotFound {
+		return err
 	}
 	if err != nil {
 		return err
 	}
 
-	return ErrConcurrentUpdate
+	return storage.ErrConcurrentUpdate
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/ltrochet/taskflow/runtime"
+	"github.com/ltrochet/taskflow/storage"
 	"github.com/ltrochet/taskflow/workflow"
 )
 
@@ -97,7 +98,7 @@ func TestRepository_CreateDuplicate(t *testing.T) {
 
 	if !errors.Is(
 		err,
-		ErrTaskAlreadyExists,
+		storage.ErrTaskAlreadyExists,
 	) {
 		t.Fatalf(
 			"expected ErrTaskAlreadyExists, got %v",
@@ -281,7 +282,7 @@ func TestRepository_AcquireSpecificQueue(t *testing.T) {
 
 	if !errors.Is(
 		err,
-		ErrNoTaskAvailable,
+		storage.ErrNoTaskAvailable,
 	) {
 		t.Fatalf(
 			"expected ErrNoTaskAvailable, got %v",
@@ -321,7 +322,7 @@ func TestRepository_AcquireNoTask(t *testing.T) {
 
 	if !errors.Is(
 		err,
-		ErrNoTaskAvailable,
+		storage.ErrNoTaskAvailable,
 	) {
 		t.Fatalf(
 			"expected ErrNoTaskAvailable, got %v",

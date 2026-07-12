@@ -6,6 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/ltrochet/taskflow/runtime"
+	"github.com/ltrochet/taskflow/storage"
 )
 
 const sqlAcquireTask = `
@@ -80,7 +81,7 @@ func (r *Repository[T]) Acquire(
 	)
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNoTaskAvailable
+		return nil, storage.ErrNoTaskAvailable
 	}
 
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/ltrochet/taskflow/runtime"
+	"github.com/ltrochet/taskflow/storage"
 )
 
 const sqlGetTask = `
@@ -48,7 +49,7 @@ func (r *Repository[T]) Get(
 	)
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrTaskNotFound
+		return nil, storage.ErrTaskNotFound
 	}
 
 	if err != nil {

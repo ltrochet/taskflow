@@ -2,26 +2,12 @@ package memory
 
 import (
 	"context"
-	"errors"
 	"slices"
 	"sync"
 
 	"github.com/google/uuid"
 	"github.com/ltrochet/taskflow/runtime"
-)
-
-var (
-	ErrTaskNotFound = errors.New(
-		"task not found",
-	)
-
-	ErrTaskAlreadyExists = errors.New(
-		"task already exists",
-	)
-
-	ErrNoTaskAvailable = errors.New(
-		"no task available",
-	)
+	"github.com/ltrochet/taskflow/storage"
 )
 
 // Repository implémente un stockage de tâches en mémoire.
@@ -46,7 +32,7 @@ func (r *Repository[T]) Create(
 	defer r.mu.Unlock()
 
 	if _, exists := r.tasks[task.ID]; exists {
-		return ErrTaskAlreadyExists
+		return storage.ErrTaskAlreadyExists
 	}
 
 	r.tasks[task.ID] = cloneTask(task)
@@ -63,7 +49,7 @@ func (r *Repository[T]) Update(
 	defer r.mu.Unlock()
 
 	if _, exists := r.tasks[task.ID]; !exists {
-		return ErrTaskNotFound
+		return storage.ErrTaskNotFound
 	}
 
 	r.tasks[task.ID] = cloneTask(task)
@@ -82,7 +68,7 @@ func (r *Repository[T]) Get(
 	task, ok := r.tasks[id]
 
 	if !ok {
-		return nil, ErrTaskNotFound
+		return nil, storage.ErrTaskNotFound
 	}
 
 	copy := cloneTask(&task)
@@ -131,7 +117,7 @@ func (r *Repository[T]) Acquire(
 		return &copy, nil
 	}
 
-	return nil, ErrNoTaskAvailable
+	return nil, storage.ErrNoTaskAvailable
 }
 
 func cloneTask[T any](
