@@ -47,16 +47,16 @@ func WithQueues[T any](
 	}
 }
 
-// WithBackoff configure le backoff utilisé lorsque
-// aucune tâche n'est disponible.
-func WithBackoff[T any](
-	backoff Backoff,
+// WithBackoffFactory configure la fabrique de backoffs
+// utilisée par Serve().
+func WithBackoffFactory[T any](
+	factory BackoffFactory,
 ) Option[T] {
 	return func(
 		c *Consumer[T],
 	) {
-		if backoff != nil {
-			c.backoff = backoff
+		if factory != nil {
+			c.backoffFactory = factory
 		}
 	}
 }
@@ -95,6 +95,23 @@ func WithRetryDelay[T any](
 	) {
 		if delay > 0 {
 			c.retryDelay = delay
+		}
+	}
+}
+
+// WithConcurrency configure le nombre de goroutines
+// d'exécution utilisées par Serve().
+//
+// La valeur doit être strictement positive.
+// Les valeurs inférieures ou égales à zéro sont ignorées.
+func WithConcurrency[T any](
+	concurrency int,
+) Option[T] {
+	return func(
+		c *Consumer[T],
+	) {
+		if concurrency > 0 {
+			c.concurrency = concurrency
 		}
 	}
 }

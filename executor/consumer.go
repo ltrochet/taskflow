@@ -32,11 +32,13 @@ type Consumer[T any] struct {
 
 	queues []runtime.Queue
 
-	backoff Backoff
+	backoffFactory BackoffFactory
 
 	errorPolicy  ErrorPolicy
 	errorHandler ErrorHandler
 	retryDelay   time.Duration
+
+	concurrency int
 }
 
 // NewConsumer crée un Consumer.
@@ -45,7 +47,10 @@ func NewConsumer[T any](
 	runner TaskRunner[T],
 	options ...Option[T],
 ) (*Consumer[T], error) {
-	backoff, err := NewDefaultBackoff()
+	factory, err := NewExponentialBackoffFactory(
+		defaultMinBackoff,
+		defaultMaxBackoff,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -58,10 +63,12 @@ func NewConsumer[T any](
 			runtime.DefaultQueue,
 		},
 
-		backoff: backoff,
+		backoffFactory: factory,
 
 		errorPolicy: ErrorPolicyStop,
 		retryDelay:  defaultRetryDelay,
+
+		concurrency: 1,
 	}
 
 	for _, option := range options {

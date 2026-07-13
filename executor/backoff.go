@@ -30,6 +30,9 @@ type Backoff interface {
 	Next() time.Duration
 }
 
+// BackoffFactory crée une nouvelle instance de Backoff.
+type BackoffFactory func() Backoff
+
 // ExponentialBackoff implémente un backoff exponentiel
 // borné.
 type ExponentialBackoff struct {
@@ -68,6 +71,30 @@ func NewExponentialBackoff(
 	}, nil
 }
 
+// NewExponentialBackoffFactory crée une fabrique de
+// backoffs exponentiels.
+func NewExponentialBackoffFactory(
+	min,
+	max time.Duration,
+) (BackoffFactory, error) {
+	// Validation de la configuration.
+	if _, err := NewExponentialBackoff(
+		min,
+		max,
+	); err != nil {
+		return nil, err
+	}
+
+	return func() Backoff {
+		// Les paramètres étant déjà validés,
+		// cette construction ne peut plus échouer.
+		return &ExponentialBackoff{
+			min: min,
+			max: max,
+		}
+	}, nil
+}
+
 // Reset réinitialise le backoff.
 //
 // Le prochain appel à Next() retournera le délai minimal.
@@ -94,13 +121,4 @@ func (b *ExponentialBackoff) Next() time.Duration {
 	b.current = next
 
 	return b.current
-}
-
-// NewDefaultBackoff crée un backoff exponentiel avec
-// les paramètres par défaut.
-func NewDefaultBackoff() (*ExponentialBackoff, error) {
-	return NewExponentialBackoff(
-		defaultMinBackoff,
-		defaultMaxBackoff,
-	)
 }
