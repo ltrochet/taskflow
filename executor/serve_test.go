@@ -3,6 +3,7 @@ package executor
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -71,11 +72,19 @@ func TestConsumer_Serve_NoTaskAvailable(t *testing.T) {
 		delay: 0,
 	}
 
+	factoryCalls := 0
+
 	consumer := newTestConsumer(
 		t,
 		acquirer,
 		runner,
-		WithBackoff[testData](backoff),
+		WithBackoffFactory[testData](
+			func() Backoff {
+				factoryCalls++
+
+				return backoff
+			},
+		),
 	)
 
 	ctx, cancel := context.WithCancel(
@@ -111,6 +120,13 @@ func TestConsumer_Serve_NoTaskAvailable(t *testing.T) {
 	if backoff.resetCalls != 0 {
 		t.Fatal(
 			"Reset() should not be called",
+		)
+	}
+
+	if factoryCalls != 1 {
+		t.Fatalf(
+			"expected 1 backoff, got %d",
+			factoryCalls,
 		)
 	}
 }
@@ -275,5 +291,120 @@ func TestConsumer_Serve_ErrorHandlerPanic(t *testing.T) {
 			context.Canceled,
 			err,
 		)
+	}
+}
+
+func TestConsumer_Serve_Concurrency(t *testing.T) {
+	acquirer := &mockTaskAcquirer{
+		err: storage.ErrNoTaskAvailable,
+	}
+
+	runner := &mockTaskRunner{}
+
+	var factoryCalls atomic.Int32
+
+	consumer := newTestConsumer(
+		t,
+		acquirer,
+		runner,
+		WithConcurrency[testData](4),
+		WithBackoffFactory[testData](
+			func() Backoff {
+				factoryCalls.Add(1)
+
+				return &mockBackoff{
+					delay: time.Millisecond,
+				}
+			},
+		),
+	)
+
+	ctx, cancel := context.WithCancel(
+		context.Background(),
+	)
+
+	go func() {
+		for acquirer.acquireCalls < 4 {
+			time.Sleep(time.Millisecond)
+		}
+
+		cancel()
+	}()
+
+	err := consumer.Serve(ctx)
+
+	if !errors.Is(
+		err,
+		context.Canceled,
+	) {
+		t.Fatalf(
+			"expected %v, got %v",
+			context.Canceled,
+			err,
+		)
+	}
+
+	if factoryCalls.Load() != 4 {
+		t.Fatalf(
+			"expected 4 backoffs, got %d",
+			factoryCalls.Load(),
+		)
+	}
+	if acquirer.acquireCalls < 4 {
+		t.Fatalf(
+			"expected at least 4 acquire calls, got %d",
+			acquirer.acquireCalls,
+		)
+	}
+}
+
+func TestConsumer_Serve_CancelStopsWorkers(t *testing.T) {
+	acquirer := &mockTaskAcquirer{
+		err: storage.ErrNoTaskAvailable,
+	}
+
+	runner := &mockTaskRunner{}
+
+	consumer := newTestConsumer(
+		t,
+		acquirer,
+		runner,
+		WithConcurrency[testData](4),
+		WithBackoffFactory[testData](
+			func() Backoff {
+				return &mockBackoff{
+					delay: time.Millisecond,
+				}
+			},
+		),
+	)
+
+	ctx, cancel := context.WithCancel(
+		context.Background(),
+	)
+
+	done := make(chan error, 1)
+
+	go func() {
+		done <- consumer.Serve(ctx)
+	}()
+
+	// Laisse le temps aux workers de démarrer.
+	time.Sleep(10 * time.Millisecond)
+
+	cancel()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf(
+				"expected %v, got %v",
+				context.Canceled,
+				err,
+			)
+		}
+
+	case <-time.After(time.Second):
+		t.Fatal("Serve() did not stop after context cancellation")
 	}
 }
